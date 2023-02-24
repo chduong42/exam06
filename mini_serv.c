@@ -1,12 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   exam06.c                                           :+:      :+:    :+:   */
+/*   mini_serv.c                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: chduong <chduong@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/24 11:36:59 by chduong           #+#    #+#             */
-/*   Updated: 2023/02/24 15:30:31 by chduong          ###   ########.fr       */
+/*   Updated: 2023/02/24 18:15:29 by chduong          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,7 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 
 typedef struct s_client 
 {
@@ -54,6 +55,7 @@ int main(int ac, char **av)
 	
 	bzero(clients, sizeof(clients));
 	bzero(&servaddr, sizeof(servaddr));
+	FD_ZERO(&active);
 
 	if (ac != 2)
 		error("Wrong number of arguments");
@@ -63,7 +65,6 @@ int main(int ac, char **av)
 		error(NULL);
 
 	maxfd = sockfd;
-	FD_ZERO(&active);
 	FD_SET(sockfd, &active);
 	
 	servaddr.sin_family = AF_INET;
@@ -80,12 +81,10 @@ int main(int ac, char **av)
 		readfds = writefds = active;
 		if (select(maxfd + 1, &readfds, &writefds, NULL, NULL) < 0)
 			continue;
-		for (int fd = 0; fd <= maxfd; ++fd)
-		{
+		for (int fd = 0; fd <= maxfd; ++fd)	{
 			if (FD_ISSET(fd, &readfds))
 			{
-				if (fd == sockfd)
-				{
+				if (fd == sockfd) {
 					int clientfd = accept(sockfd, (struct sockaddr*)&servaddr, &len);
 					if (clientfd < 0)
 						continue;
@@ -94,21 +93,16 @@ int main(int ac, char **av)
 					FD_SET(clientfd, &active);
 					sprintf(buftowrite, "server: client %d has arrived\n", clients[clientfd].id);
 					sendAll(clientfd);
-					break;
 				}
-				else
-				{
+				else {
 					int nbytes = recv(fd, buftoread, 70000, 0);
-					if (nbytes <= 0)
-					{
+					if (nbytes <= 0) {
 						sprintf(buftowrite, "server client %d has left\n", clients[fd].id);
 						sendAll(fd);
 						FD_CLR(fd, &active);
 						close(fd);
-						break;
 					}
-					else
-					{
+					else {
 						for (int i = 0, j = strlen(clients[fd].msg); i < nbytes; ++i, ++j)
 						{
 							clients[fd].msg[j] = buftoread[i];
@@ -122,8 +116,8 @@ int main(int ac, char **av)
 							}
 						}
 					}
-					break;
 				}
+				break;
 			}
 		}
 	}
